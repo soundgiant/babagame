@@ -6,13 +6,14 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="icon.png">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
     <title>Baba Mama Arcade</title>
     <style>
         body, html { 
             margin: 0; padding: 0; width: 100%; height: 100%; 
             overflow: hidden; background: #000; font-family: -apple-system, sans-serif;
             touch-action: manipulation;
-            -webkit-tap-highlight-color: transparent; /* Removes tap grey box */
+            -webkit-tap-highlight-color: transparent;
         }
         #border-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -44,11 +45,11 @@
         .emoji { position: absolute; pointer-events: none; z-index: 4000; }
     </style>
 </head>
-<body onclick="bootAudio()">
+<body>
 
     <div id="border-overlay"></div>
 
-    <div id="scr-splash" class="screen active"><img src="splash.jpg" class="full"></div>
+    <div id="scr-splash" class="screen active" onclick="bootAudio()"><img src="splash.jpg" class="full"></div>
     <div id="scr-choice" class="screen" onclick="pick(event)"><img src="choice.jpg" class="full"></div>
     <div id="scr-ready" class="screen"><img src="spin.jpg" id="spin-btn" onclick="startTheGame()"></div>
     
@@ -57,15 +58,20 @@
     <div id="scr-win" class="screen"><img src="win.jpg" class="full"></div>
     <div id="scr-fail" class="screen"><img src="tryagain.jpg" class="full"></div>
 
-    <audio id="s-bg" src="music.mp3" loop playsinline></audio>
-    
-    <audio id="sfx-splash" src="splash.mp3" playsinline preload="auto"></audio>
-    <audio id="sfx-choice" src="choice.mp3" playsinline preload="auto"></audio>
-    <audio id="sfx-jackpot" src="jackpot.mp3" playsinline preload="auto"></audio>
-    <audio id="sfx-win" src="win.mp3" playsinline preload="auto"></audio>
-    <audio id="sfx-fail" src="fail.mp3" playsinline preload="auto"></audio>
-
     <script>
+        // --- AUDIO ENGINE (HOWLER) ---
+        // This loads the sounds into memory so they are ready instantly.
+        // Make sure these filenames match exactly what is in your folder!
+        
+        var sounds = {
+            bg:      new Howl({ src: ['music.mp3'], loop: true, volume: 0.6 }),
+            splash:  new Howl({ src: ['splash.mp3'] }),
+            choice:  new Howl({ src: ['choice.mp3'] }),
+            jackpot: new Howl({ src: ['jackpot.mp3'] }),
+            win:     new Howl({ src: ['win.mp3'] }),
+            fail:    new Howl({ src: ['fail.mp3'] })
+        };
+
         let userGuess = "", spinCount = 0, audioUnlocked = false, isSpinning = false, currentResult = null;
         let jackpotGoal = Math.floor(Math.random() * 4) + 3;
         const bucket = ["🚒","🚜","🚀","🛸","🦁","🐘","🐸","🍦","🌈","🦄","🐶","🐱","🍎","🍕","🪙"];
@@ -80,37 +86,12 @@
         function bootAudio() {
             if (audioUnlocked) return;
             
-            // Play background music
-            document.getElementById('s-bg').play();
+            // Howler handles the "unlock" automatically on the first user interaction
+            sounds.bg.play();
+            sounds.splash.play();
             
-            // Play the first SFX
-            playSFX('splash');
-
-            // TRICK: Quickly play and pause ALL other sounds to "unlock" them on iOS
-            ['choice', 'jackpot', 'win', 'fail'].forEach(id => {
-                let el = document.getElementById('sfx-' + id);
-                el.volume = 0; // Silent unlock
-                el.play().then(() => {
-                    el.pause();
-                    el.currentTime = 0;
-                    el.volume = 1; // Restore volume
-                }).catch(e => console.log("Unlock skipped", e));
-            });
-
             audioUnlocked = true;
             flow('choice');
-        }
-
-        // UPDATED: Finds the specific player by ID and plays it
-        function playSFX(name) {
-            // Strip .mp3 if passed accidentally, though I updated calls to just use names
-            name = name.replace('.mp3', ''); 
-            
-            const sfx = document.getElementById('sfx-' + name);
-            if(sfx) {
-                sfx.currentTime = 0; // Rewind to start if hit rapidly
-                sfx.play().catch(e => console.log("SFX Blocked:", e));
-            }
         }
 
         function flow(scr) {
@@ -121,7 +102,7 @@
 
         function pick(e) {
             userGuess = (e.clientY < window.innerHeight / 2) ? "baba" : "mama";
-            playSFX('choice'); // removed .mp3
+            sounds.choice.play();
             flow('ready');
             document.getElementById('spin-btn').classList.remove('spin-action');
         }
@@ -137,7 +118,7 @@
             let count = 0;
             const shuffleInterval = setInterval(() => {
                 document.getElementById('pic').src = deck[Math.floor(Math.random() * deck.length)];
-                if(++count > 40) { // 4 SECONDS
+                if(++count > 40) { 
                     clearInterval(shuffleInterval);
                     isSpinning = false;
                     prepareResult();
@@ -170,12 +151,14 @@
             } else { 
                 doFail(); 
             }
-            currentResult = null; // Reset
+            currentResult = null; 
         }
 
         function doWin(jp, isMama) {
             flow('win');
-            playSFX(jp ? 'jackpot' : 'win');
+            if(jp) sounds.jackpot.play();
+            else sounds.win.play();
+
             let emojis = jp ? ["🪙","🌟","✨"] : (isMama ? ["👩","❤️"] : ["🍌","💛"]);
             for(let i=0; i<(jp?80:40); i++) spawn(jp, emojis);
             setTimeout(() => flow('choice'), 4500);
@@ -183,7 +166,7 @@
 
         function doFail() {
             flow('fail');
-            playSFX('fail');
+            sounds.fail.play();
             for(let i=0; i<40; i++) spawn(false, bucket);
             setTimeout(() => flow('choice'), 3500);
         }
