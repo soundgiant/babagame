@@ -12,6 +12,7 @@
             margin: 0; padding: 0; width: 100%; height: 100%; 
             overflow: hidden; background: #000; font-family: -apple-system, sans-serif;
             touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent; /* Removes tap grey box */
         }
         #border-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -57,7 +58,12 @@
     <div id="scr-fail" class="screen"><img src="tryagain.jpg" class="full"></div>
 
     <audio id="s-bg" src="music.mp3" loop playsinline></audio>
-    <audio id="s-sfx" playsinline></audio>
+    
+    <audio id="sfx-splash" src="splash.mp3" playsinline preload="auto"></audio>
+    <audio id="sfx-choice" src="choice.mp3" playsinline preload="auto"></audio>
+    <audio id="sfx-jackpot" src="jackpot.mp3" playsinline preload="auto"></audio>
+    <audio id="sfx-win" src="win.mp3" playsinline preload="auto"></audio>
+    <audio id="sfx-fail" src="fail.mp3" playsinline preload="auto"></audio>
 
     <script>
         let userGuess = "", spinCount = 0, audioUnlocked = false, isSpinning = false, currentResult = null;
@@ -73,17 +79,38 @@
 
         function bootAudio() {
             if (audioUnlocked) return;
+            
+            // Play background music
             document.getElementById('s-bg').play();
-            playSFX('splash.mp3');
+            
+            // Play the first SFX
+            playSFX('splash');
+
+            // TRICK: Quickly play and pause ALL other sounds to "unlock" them on iOS
+            ['choice', 'jackpot', 'win', 'fail'].forEach(id => {
+                let el = document.getElementById('sfx-' + id);
+                el.volume = 0; // Silent unlock
+                el.play().then(() => {
+                    el.pause();
+                    el.currentTime = 0;
+                    el.volume = 1; // Restore volume
+                }).catch(e => console.log("Unlock skipped", e));
+            });
+
             audioUnlocked = true;
             flow('choice');
         }
 
-        function playSFX(file) {
-            const sfx = document.getElementById('s-sfx');
-            sfx.src = file;
-            sfx.load();
-            sfx.play().catch(e => console.log("Audio block bypass failed"));
+        // UPDATED: Finds the specific player by ID and plays it
+        function playSFX(name) {
+            // Strip .mp3 if passed accidentally, though I updated calls to just use names
+            name = name.replace('.mp3', ''); 
+            
+            const sfx = document.getElementById('sfx-' + name);
+            if(sfx) {
+                sfx.currentTime = 0; // Rewind to start if hit rapidly
+                sfx.play().catch(e => console.log("SFX Blocked:", e));
+            }
         }
 
         function flow(scr) {
@@ -94,7 +121,7 @@
 
         function pick(e) {
             userGuess = (e.clientY < window.innerHeight / 2) ? "baba" : "mama";
-            playSFX('choice.mp3');
+            playSFX('choice'); // removed .mp3
             flow('ready');
             document.getElementById('spin-btn').classList.remove('spin-action');
         }
@@ -130,8 +157,6 @@
             const overlay = document.getElementById('border-overlay');
             if(isJP) overlay.className = "neon-jackpot";
             else overlay.className = (isMama ? "neon-purple" : "neon-yellow");
-            
-            // NOTE: We don't play the sound here anymore. We wait for the TAP!
         }
 
         function checkResult() {
@@ -150,7 +175,7 @@
 
         function doWin(jp, isMama) {
             flow('win');
-            playSFX(jp ? 'jackpot.mp3' : 'win.mp3');
+            playSFX(jp ? 'jackpot' : 'win');
             let emojis = jp ? ["🪙","🌟","✨"] : (isMama ? ["👩","❤️"] : ["🍌","💛"]);
             for(let i=0; i<(jp?80:40); i++) spawn(jp, emojis);
             setTimeout(() => flow('choice'), 4500);
@@ -158,7 +183,7 @@
 
         function doFail() {
             flow('fail');
-            playSFX('fail.mp3');
+            playSFX('fail');
             for(let i=0; i<40; i++) spawn(false, bucket);
             setTimeout(() => flow('choice'), 3500);
         }
