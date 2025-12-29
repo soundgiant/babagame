@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Baba Mama Arcade</title>
+    <style>
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            overflow: hidden; background: #000; font-family: -apple-system, sans-serif;
+            touch-action: manipulation;
+        }
+        /* The container that holds the border */
+        .screen { 
+            display: none; width: 100%; height: 100%; position: absolute; 
+            box-sizing: border-box; overflow: hidden;
+        }
+        .active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        
+        /* Fixed Borders for Safari */
+        .border-yellow { border: 25px solid #FFDE59 !important; }
+        .border-purple { border: 25px solid #A020F0 !important; }
+        .border-rainbow { border: 25px solid red !important; animation: rainbowAni 0.2s infinite; }
+        
+        @keyframes rainbowAni {
+            0% { border-color: red; filter: hue-rotate(0deg); }
+            100% { border-color: red; filter: hue-rotate(360deg); }
+        }
+
+        img.full { width: 100%; height: 100%; object-fit: cover; }
+        .game-photo { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+        
+        #spin-btn { width: 100%; height: 100%; animation: pulse 1s infinite; cursor: pointer; }
+        @keyframes pulse { 0% {transform: scale(1);} 50% {transform: scale(1.03);} 100% {transform: scale(1);} }
+
+        .emoji { position: absolute; pointer-events: none; z-index: 999; }
+        #score-bar { 
+            position: absolute; top: 40px; left: 25px; 
+            font-size: 35px; z-index: 1000; pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="score-bar"></div>
+
+    <div id="scr-splash" class="screen active" onclick="fullUnlock()"><img src="splash.jpg" class="full"></div>
+    <div id="scr-choice" class="screen" onclick="pick(event)"><img src="choice.jpg" class="full"></div>
+    <div id="scr-ready" class="screen" onclick="flow('game')"><img src="spin.jpg" id="spin-btn"></div>
+    <div id="scr-game" class="screen"><img id="pic" class="game-photo" src="baba1.jpg"></div>
+    <div id="scr-win" class="screen"></div>
+    <div id="scr-fail" class="screen"><img src="tryagain.jpg" class="full"></div>
+
+    <audio id="s-bg" src="music.mp3" loop playsinline></audio>
+    <audio id="s-splash" src="splash.mp3" playsinline></audio>
+    <audio id="s-choice" src="choice.mp3" playsinline></audio>
+    <audio id="s-spin" src="spin.mp3" playsinline></audio>
+    <audio id="s-win" src="win.mp3" playsinline></audio>
+    <audio id="s-fail" src="fail.mp3" playsinline></audio>
+    <audio id="s-jackpot" src="jackpot.mp3" playsinline></audio>
+
+    <script>
+        let score = 0, userGuess = "", spinCount = 0;
+        let jackpotGoal = Math.floor(Math.random() * 4) + 3;
+        const bucket = ["🚒","🚜","🚀","🚁","🚂","🏎️","🦁","🐘","🦒","🦖","🦕","🐸","🎈","🌈","🍦","🍭","🎨","🐎","🦄","🐶","🐱","🍎","🍕","🛸"];
+
+        // FORCE UNLOCK ALL AUDIO
+        function fullUnlock() {
+            const sounds = ['s-bg', 's-splash', 's-choice', 's-spin', 's-win', 's-fail', 's-jackpot'];
+            sounds.forEach(id => {
+                const el = document.getElementById(id);
+                el.play().then(() => { el.pause(); el.currentTime = 0; }).catch(e => console.log(e));
+            });
+            
+            // Start the background music and splash sound
+            document.getElementById('s-bg').play();
+            setTimeout(() => { playSound('s-splash'); }, 100);
+            flow('choice');
+        }
+
+        function flow(scr) {
+            const all = document.querySelectorAll('.screen');
+            all.forEach(s => {
+                s.style.display = 'none';
+                s.classList.remove('active', 'border-yellow', 'border-purple', 'border-rainbow');
+            });
+            const target = document.getElementById('scr-' + scr);
+            target.style.display = 'flex';
+            target.classList.add('active');
+            if(scr === 'game') startSpin();
+        }
+
+        function playSound(id) {
+            const a = document.getElementById(id);
+            a.currentTime = 0;
+            a.play().catch(err => console.log("Safari blocked: ", id));
+        }
+
+        function pick(e) {
+            userGuess = (e.clientY < window.innerHeight / 2) ? "mama" : "baba";
+            playSound('s-choice');
+            flow('ready');
+        }
+
+        function startSpin() {
+            let count = 0;
+            const timer = setInterval(() => {
+                let t = Math.random() > 0.5 ? "mama" : "baba";
+                document.getElementById('pic').src = t + (Math.floor(Math.random()*10)+1) + ".jpg";
+                playSound('s-spin');
+                if(++count > 15) { clearInterval(timer); finish(); }
+            }, 100);
+        }
+
+        function finish() {
+            spinCount++;
+            let isJP = (spinCount >= jackpotGoal);
+            let resultType = isJP ? "babamama" : (Math.random() > 0.5 ? "mama" : "baba");
+            document.getElementById('pic').src = isJP ? "babamama.jpg" : resultType + (Math.floor(Math.random()*10)+1) + ".jpg";
+
+            setTimeout(() => {
+                if(isJP || resultType === userGuess) {
+                    if(isJP) { spinCount = 0; jackpotGoal = Math.floor(Math.random()*4)+3; }
+                    doWin(isJP, resultType);
+                } else { doFail(); }
+            }, 1000);
+        }
+
+        function doWin(jp, type) {
+            const winScr = document.getElementById('scr-win');
+            winScr.innerHTML = `<img src="win.jpg" class="full">`;
+            
+            if(jp) {
+                winScr.classList.add('border-rainbow');
+                playSound('s-jackpot');
+                score += 3;
+                for(let i=0; i<80; i++) spawn(true, ["🍌","👩","🌟","✨"]);
+            } else {
+                winScr.classList.add(type === 'mama' ? 'border-purple' : 'border-yellow');
+                playSound('s-win');
+                score += 1;
+                for(let i=0; i<40; i++) spawn(false, type === "mama" ? ["👩","❤️"] : ["🍌","💛"]);
+            }
+            
+            if(score > 12) score = 1; 
+            document.getElementById('score-bar').innerText = "🍌".repeat(score);
+            
+            flow('win');
+            setTimeout(() => flow('choice'), 4000);
+        }
+
+        function doFail() {
+            flow('fail');
+            playSound('s-fail');
+            for(let i=0; i<40; i++) spawn(false, [bucket[Math.floor(Math.random()*bucket.length)]]);
+            setTimeout(() => flow('choice'), 3000);
+        }
+
+        function spawn(isFirework, list) {
+            const el = document.createElement('div');
+            el.className = 'emoji';
+            el.innerText = list[Math.floor(Math.random()*list.length)];
+            el.style.fontSize = (Math.random() * 70 + 30) + "px";
+            document.body.appendChild(el);
+
+            let x, y, vx, vy;
+            if(isFirework) {
+                x = window.innerWidth / 2; y = window.innerHeight / 2;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 22 + 6;
+                vx = Math.cos(angle) * speed; vy = Math.sin(angle) * speed;
+            } else {
+                x = Math.random() * window.innerWidth;
+                y = window.innerHeight + 100;
+                vx = (Math.random() - 0.5) * 10;
+                vy = -(Math.random() * 30 + 20); // MASSIVE LAUNCH
+            }
+
+            let rot = 0, rotS = (Math.random()-0.5) * 20;
+            const anim = setInterval(() => {
+                x += vx; y += vy; vy += 0.22; // Lower gravity for higher flight
+                rot += rotS;
+                el.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${rot}deg)`;
+                if(y > window.innerHeight + 300 || x < -300 || x > window.innerWidth + 300) {
+                    clearInterval(anim); el.remove();
+                }
+            }, 20);
+        }
+    </script>
+</body>
+</html>
