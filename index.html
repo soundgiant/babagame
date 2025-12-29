@@ -21,18 +21,18 @@
         .screen { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
         .active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
         
-        /* Neon Pulse Borders */
+        /* Pulse Animations */
         .neon-yellow { border: 25px solid #FFDE59; animation: pulseY 0.8s infinite alternate; }
-        @keyframes pulseY { from { box-shadow: inset 0 0 15px #FFDE59, 0 0 15px #FFDE59; } to { box-shadow: inset 0 0 50px #FFDE59, 0 0 30px #FFDE59; } }
+        @keyframes pulseY { from { box-shadow: inset 0 0 15px #FFDE59; } to { box-shadow: inset 0 0 60px #FFDE59; } }
 
         .neon-purple { border: 25px solid #A020F0; animation: pulseP 0.8s infinite alternate; }
-        @keyframes pulseP { from { box-shadow: inset 0 0 15px #A020F0, 0 0 15px #A020F0; } to { box-shadow: inset 0 0 50px #A020F0, 0 0 30px #A020F0; } }
+        @keyframes pulseP { from { box-shadow: inset 0 0 15px #A020F0; } to { box-shadow: inset 0 0 60px #A020F0; } }
 
         .neon-jackpot { border: 25px solid #fff; animation: nFlash 0.2s infinite; }
         @keyframes nFlash { 0% { border-color: red; box-shadow: 0 0 40px red; } 50% { border-color: cyan; box-shadow: 0 0 40px cyan; } 100% { border-color: yellow; box-shadow: 0 0 40px yellow; } }
 
         img.full { width: 100%; height: 100%; object-fit: cover; }
-        .game-photo { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+        .game-photo { width: 100%; height: 100%; object-fit: contain; background: #fff; cursor: pointer; }
         
         #spin-btn { 
             width: 100%; height: 100%; object-fit: cover;
@@ -50,7 +50,9 @@
     <div id="scr-splash" class="screen active"><img src="splash.jpg" class="full"></div>
     <div id="scr-choice" class="screen" onclick="pick(event)"><img src="choice.jpg" class="full"></div>
     <div id="scr-ready" class="screen"><img src="spin.jpg" id="spin-btn" onclick="startTheGame()"></div>
-    <div id="scr-game" class="screen"><img id="pic" class="game-photo" src="baba1.jpg"></div>
+    
+    <div id="scr-game" class="screen" onclick="checkResult()"><img id="pic" class="game-photo" src="baba1.jpg"></div>
+    
     <div id="scr-win" class="screen"><img src="win.jpg" class="full"></div>
     <div id="scr-fail" class="screen"><img src="tryagain.jpg" class="full"></div>
 
@@ -58,7 +60,7 @@
     <audio id="s-sfx" playsinline></audio>
 
     <script>
-        let userGuess = "", spinCount = 0, audioUnlocked = false;
+        let userGuess = "", spinCount = 0, audioUnlocked = false, isSpinning = false, currentResult = null;
         let jackpotGoal = Math.floor(Math.random() * 4) + 3;
         const bucket = ["🚒","🚜","🚀","🛸","🦁","🐘","🐸","🍦","🌈","🦄","🐶","🐱","🍎","🍕","🪙"];
 
@@ -71,29 +73,17 @@
 
         function bootAudio() {
             if (audioUnlocked) return;
-            const bg = document.getElementById('s-bg');
-            const sfx = document.getElementById('s-sfx');
-            
-            // Force load both
-            bg.play().then(() => { bg.volume = 0.4; }).catch(()=>{});
-            sfx.play().catch(()=>{}); 
-            
-            audioUnlocked = true;
+            document.getElementById('s-bg').play();
             playSFX('splash.mp3');
+            audioUnlocked = true;
             flow('choice');
         }
 
         function playSFX(file) {
             const sfx = document.getElementById('s-sfx');
-            const bg = document.getElementById('s-bg');
-            
-            // Momentarily "dip" the background music so SFX can play
-            bg.volume = 0.1; 
             sfx.src = file;
             sfx.load();
-            sfx.play().then(() => {
-                setTimeout(() => { bg.volume = 0.4; }, 1000);
-            }).catch(e => console.log("SFX Blocked"));
+            sfx.play().catch(e => console.log("Audio block bypass failed"));
         }
 
         function flow(scr) {
@@ -116,38 +106,46 @@
 
         function startSpin() {
             if(deck.length < 5) refreshDeck();
+            isSpinning = true;
             let count = 0;
             const shuffleInterval = setInterval(() => {
                 document.getElementById('pic').src = deck[Math.floor(Math.random() * deck.length)];
-                
-                // Play spin sound every 4th frame to prevent audio overlap lag
-                if(count % 4 === 0) playSFX('spin.mp3');
-                
-                if(++count > 40) { // 4 SECONDS (at 100ms per frame)
+                if(++count > 40) { // 4 SECONDS
                     clearInterval(shuffleInterval);
-                    finish();
+                    isSpinning = false;
+                    prepareResult();
                 }
             }, 100);
         }
 
-        function finish() {
+        function prepareResult() {
             spinCount++;
             let isJP = (spinCount >= jackpotGoal);
             let resultImg = isJP ? "babamama.jpg" : deck.pop();
             let isMama = resultImg.includes("mama");
             
             document.getElementById('pic').src = resultImg;
+            currentResult = { isJP, isMama };
+
             const overlay = document.getElementById('border-overlay');
             if(isJP) overlay.className = "neon-jackpot";
             else overlay.className = (isMama ? "neon-purple" : "neon-yellow");
+            
+            // NOTE: We don't play the sound here anymore. We wait for the TAP!
+        }
 
-            setTimeout(() => {
-                let won = isJP || (isMama && userGuess === "mama") || (!isMama && userGuess === "baba");
-                if(won) {
-                    if(isJP) { spinCount = 0; jackpotGoal = Math.floor(Math.random()*4)+3; }
-                    doWin(isJP, isMama);
-                } else { doFail(); }
-            }, 4000);
+        function checkResult() {
+            if (isSpinning || !currentResult) return;
+            
+            let won = currentResult.isJP || (currentResult.isMama && userGuess === "mama") || (!currentResult.isMama && userGuess === "baba");
+            
+            if(won) {
+                if(currentResult.isJP) { spinCount = 0; jackpotGoal = Math.floor(Math.random()*4)+3; }
+                doWin(currentResult.isJP, currentResult.isMama);
+            } else { 
+                doFail(); 
+            }
+            currentResult = null; // Reset
         }
 
         function doWin(jp, isMama) {
