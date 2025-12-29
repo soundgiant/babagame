@@ -2,30 +2,34 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Baba Mama Arcade</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Mama Baba Arcade</title>
+
     <style>
         body, html { 
             margin: 0; padding: 0; width: 100%; height: 100%; 
             overflow: hidden; background: #000; font-family: -apple-system, sans-serif;
             touch-action: manipulation;
         }
-        /* The container that holds the border */
-        .screen { 
-            display: none; width: 100%; height: 100%; position: absolute; 
-            box-sizing: border-box; overflow: hidden;
+
+        /* THE BORDER LAYER - Sits on top of everything */
+        #border-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 2000; box-sizing: border-box;
+            border: 0px solid transparent; transition: border 0.1s;
         }
+
+        .screen { display: none; width: 100%; height: 100%; position: absolute; }
         .active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
         
-        /* Fixed Borders for Safari */
-        .border-yellow { border: 25px solid #FFDE59 !important; }
-        .border-purple { border: 25px solid #A020F0 !important; }
-        .border-rainbow { border: 25px solid red !important; animation: rainbowAni 0.2s infinite; }
-        
-        @keyframes rainbowAni {
-            0% { border-color: red; filter: hue-rotate(0deg); }
-            100% { border-color: red; filter: hue-rotate(360deg); }
-        }
+        /* Border Classes */
+        .b-yellow { border: 25px solid #FFDE59 !important; }
+        .b-purple { border: 25px solid #A020F0 !important; }
+        .b-rainbow { border: 25px solid red !important; animation: rAni 0.2s infinite; }
+        @keyframes rAni { 0% {filter: hue-rotate(0deg);} 100% {filter: hue-rotate(360deg);} }
 
         img.full { width: 100%; height: 100%; object-fit: cover; }
         .game-photo { width: 100%; height: 100%; object-fit: contain; background: #fff; }
@@ -34,21 +38,19 @@
         @keyframes pulse { 0% {transform: scale(1);} 50% {transform: scale(1.03);} 100% {transform: scale(1);} }
 
         .emoji { position: absolute; pointer-events: none; z-index: 999; }
-        #score-bar { 
-            position: absolute; top: 40px; left: 25px; 
-            font-size: 35px; z-index: 1000; pointer-events: none;
-        }
+        #score-bar { position: absolute; top: 50px; left: 30px; font-size: 35px; z-index: 1000; }
     </style>
 </head>
-<body>
+<body onclick="startAudioOnFirstTouch()">
 
+    <div id="border-layer"></div>
     <div id="score-bar"></div>
 
-    <div id="scr-splash" class="screen active" onclick="fullUnlock()"><img src="splash.jpg" class="full"></div>
+    <div id="scr-splash" class="screen active"><img src="splash.jpg" class="full"></div>
     <div id="scr-choice" class="screen" onclick="pick(event)"><img src="choice.jpg" class="full"></div>
     <div id="scr-ready" class="screen" onclick="flow('game')"><img src="spin.jpg" id="spin-btn"></div>
     <div id="scr-game" class="screen"><img id="pic" class="game-photo" src="baba1.jpg"></div>
-    <div id="scr-win" class="screen"></div>
+    <div id="scr-win" class="screen"><img src="win.jpg" class="full"></div>
     <div id="scr-fail" class="screen"><img src="tryagain.jpg" class="full"></div>
 
     <audio id="s-bg" src="music.mp3" loop playsinline></audio>
@@ -60,45 +62,43 @@
     <audio id="s-jackpot" src="jackpot.mp3" playsinline></audio>
 
     <script>
-        let score = 0, userGuess = "", spinCount = 0;
+        let score = 0, userGuess = "", spinCount = 0, audioUnlocked = false;
         let jackpotGoal = Math.floor(Math.random() * 4) + 3;
         const bucket = ["🚒","🚜","🚀","🚁","🚂","🏎️","🦁","🐘","🦒","🦖","🦕","🐸","🎈","🌈","🍦","🍭","🎨","🐎","🦄","🐶","🐱","🍎","🍕","🛸"];
 
-        // FORCE UNLOCK ALL AUDIO
-        function fullUnlock() {
+        function startAudioOnFirstTouch() {
+            if (audioUnlocked) return;
             const sounds = ['s-bg', 's-splash', 's-choice', 's-spin', 's-win', 's-fail', 's-jackpot'];
             sounds.forEach(id => {
-                const el = document.getElementById(id);
-                el.play().then(() => { el.pause(); el.currentTime = 0; }).catch(e => console.log(e));
+                const a = document.getElementById(id);
+                a.play(); a.pause(); a.currentTime = 0;
             });
-            
-            // Start the background music and splash sound
+            audioUnlocked = true;
             document.getElementById('s-bg').play();
-            setTimeout(() => { playSound('s-splash'); }, 100);
+            forcePlay('s-splash');
             flow('choice');
         }
 
         function flow(scr) {
-            const all = document.querySelectorAll('.screen');
-            all.forEach(s => {
-                s.style.display = 'none';
-                s.classList.remove('active', 'border-yellow', 'border-purple', 'border-rainbow');
-            });
+            document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
             const target = document.getElementById('scr-' + scr);
             target.style.display = 'flex';
             target.classList.add('active');
+            
+            // Reset borders when moving screens
+            document.getElementById('border-layer').className = "";
             if(scr === 'game') startSpin();
         }
 
-        function playSound(id) {
+        function forcePlay(id) {
             const a = document.getElementById(id);
             a.currentTime = 0;
-            a.play().catch(err => console.log("Safari blocked: ", id));
+            a.play();
         }
 
         function pick(e) {
             userGuess = (e.clientY < window.innerHeight / 2) ? "mama" : "baba";
-            playSound('s-choice');
+            forcePlay('s-choice');
             flow('ready');
         }
 
@@ -107,7 +107,7 @@
             const timer = setInterval(() => {
                 let t = Math.random() > 0.5 ? "mama" : "baba";
                 document.getElementById('pic').src = t + (Math.floor(Math.random()*10)+1) + ".jpg";
-                playSound('s-spin');
+                forcePlay('s-spin');
                 if(++count > 15) { clearInterval(timer); finish(); }
             }, 100);
         }
@@ -127,31 +127,27 @@
         }
 
         function doWin(jp, type) {
-            const winScr = document.getElementById('scr-win');
-            winScr.innerHTML = `<img src="win.jpg" class="full">`;
-            
+            const b = document.getElementById('border-layer');
             if(jp) {
-                winScr.classList.add('border-rainbow');
-                playSound('s-jackpot');
+                b.className = "b-rainbow";
+                forcePlay('s-jackpot');
                 score += 3;
                 for(let i=0; i<80; i++) spawn(true, ["🍌","👩","🌟","✨"]);
             } else {
-                winScr.classList.add(type === 'mama' ? 'border-purple' : 'border-yellow');
-                playSound('s-win');
+                b.className = (type === 'mama' ? 'b-purple' : 'b-yellow');
+                forcePlay('s-win');
                 score += 1;
                 for(let i=0; i<40; i++) spawn(false, type === "mama" ? ["👩","❤️"] : ["🍌","💛"]);
             }
-            
             if(score > 12) score = 1; 
             document.getElementById('score-bar').innerText = "🍌".repeat(score);
-            
             flow('win');
             setTimeout(() => flow('choice'), 4000);
         }
 
         function doFail() {
             flow('fail');
-            playSound('s-fail');
+            forcePlay('s-fail');
             for(let i=0; i<40; i++) spawn(false, [bucket[Math.floor(Math.random()*bucket.length)]]);
             setTimeout(() => flow('choice'), 3000);
         }
@@ -167,21 +163,22 @@
             if(isFirework) {
                 x = window.innerWidth / 2; y = window.innerHeight / 2;
                 const angle = Math.random() * Math.PI * 2;
-                const speed = Math.random() * 22 + 6;
+                const speed = Math.random() * 18 + 5;
                 vx = Math.cos(angle) * speed; vy = Math.sin(angle) * speed;
             } else {
                 x = Math.random() * window.innerWidth;
-                y = window.innerHeight + 100;
+                y = window.innerHeight + 50;
                 vx = (Math.random() - 0.5) * 10;
-                vy = -(Math.random() * 30 + 20); // MASSIVE LAUNCH
+                vy = -(Math.random() * 20 + 10); // HEAVIER LAUNCH
             }
 
             let rot = 0, rotS = (Math.random()-0.5) * 20;
             const anim = setInterval(() => {
-                x += vx; y += vy; vy += 0.22; // Lower gravity for higher flight
+                x += vx; y += vy; 
+                vy += 0.8; // STRONGER GRAVITY (heavier fall)
                 rot += rotS;
                 el.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${rot}deg)`;
-                if(y > window.innerHeight + 300 || x < -300 || x > window.innerWidth + 300) {
+                if(y > window.innerHeight + 200 || x < -200 || x > window.innerWidth + 200) {
                     clearInterval(anim); el.remove();
                 }
             }, 20);
@@ -189,3 +186,4 @@
     </script>
 </body>
 </html>
+
