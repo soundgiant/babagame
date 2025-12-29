@@ -6,7 +6,9 @@
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Mama Baba">
+    <meta name="apple-mobile-web-app-title" content="Baba Mama">
+    
+    <link rel="apple-touch-icon" href="icon.png">
 
     <style>
         body, html { 
@@ -15,7 +17,7 @@
             touch-action: manipulation;
         }
 
-        /* The Glass Border Layer */
+        /* The Neon Border Overlay */
         #border-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 5000; box-sizing: border-box;
@@ -25,30 +27,39 @@
         .screen { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
         .active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
         
-        /* High-Visibility Safari Borders */
-        .b-yellow { border: 25px solid #FFDE59 !important; }
-        .b-purple { border: 25px solid #A020F0 !important; }
-        .b-rainbow { border: 25px solid red !important; animation: rAni 0.3s infinite; }
-        @keyframes rAni { 0% {filter: hue-rotate(0deg);} 100% {filter: hue-rotate(360deg);} }
+        /* Neon Styles */
+        .neon-yellow { border: 20px solid #FFDE59; box-shadow: inset 0 0 20px #FFDE59, 0 0 20px #FFDE59 !important; }
+        .neon-purple { border: 20px solid #A020F0; box-shadow: inset 0 0 20px #A020F0, 0 0 20px #A020F0 !important; }
+        .neon-jackpot { border: 20px solid #fff; animation: neonFlash 0.3s infinite; }
+        
+        @keyframes neonFlash {
+            0% { border-color: #ff0000; box-shadow: 0 0 30px #ff0000; }
+            33% { border-color: #00ff00; box-shadow: 0 0 30px #00ff00; }
+            66% { border-color: #0000ff; box-shadow: 0 0 30px #0000ff; }
+            100% { border-color: #ff0000; box-shadow: 0 0 30px #ff0000; }
+        }
 
         img.full { width: 100%; height: 100%; object-fit: cover; }
         .game-photo { width: 100%; height: 100%; object-fit: contain; background: #fff; }
         
-        #spin-btn { width: 100%; height: 100%; animation: pulse 1s infinite; cursor: pointer; }
-        @keyframes pulse { 0% {transform: scale(1);} 50% {transform: scale(1.03);} 100% {transform: scale(1);} }
+        /* Spin Button Animation */
+        #spin-btn { 
+            width: 60%; height: auto; 
+            transition: transform 0.5s ease-in, opacity 0.5s ease-out;
+            cursor: pointer;
+        }
+        .spin-shrink { transform: scale(0); opacity: 0; }
 
-        .emoji { position: absolute; pointer-events: none; z-index: 999; }
-        #score-bar { position: absolute; top: 60px; left: 30px; font-size: 35px; z-index: 6000; }
+        .emoji { position: absolute; pointer-events: none; z-index: 4000; }
     </style>
 </head>
-<body onclick="unlockAndStart()">
+<body onclick="unlockAudio()">
 
     <div id="border-overlay"></div>
-    <div id="score-bar"></div>
 
     <div id="scr-splash" class="screen active"><img src="splash.jpg" class="full"></div>
     <div id="scr-choice" class="screen" onclick="pick(event)"><img src="choice.jpg" class="full"></div>
-    <div id="scr-ready" class="screen" onclick="flow('game')"><img src="spin.jpg" id="spin-btn"></div>
+    <div id="scr-ready" class="screen"><img src="spin.jpg" id="spin-btn" onclick="startTheGame()"></div>
     <div id="scr-game" class="screen"><img id="pic" class="game-photo" src="baba1.jpg"></div>
     <div id="scr-win" class="screen"><img src="win.jpg" class="full"></div>
     <div id="scr-fail" class="screen"><img src="tryagain.jpg" class="full"></div>
@@ -62,42 +73,42 @@
     <audio id="s-jackpot" src="jackpot.mp3" playsinline></audio>
 
     <script>
-        let score = 0, userGuess = "", spinCount = 0, unlocked = false;
+        let userGuess = "", spinCount = 0, audioStarted = false;
         let jackpotGoal = Math.floor(Math.random() * 4) + 3;
-        const bucket = ["🚒","🚜","🚀","🚁","🚂","🏎️","🦁","🐘","🦒","🦖","🦕","🐸","🎈","🌈","🍦","🍭","🎨","🐎","🦄","🐶","🐱","🍎","🍕","🛸"];
+        const bucket = ["🚒","🚜","🚀","🚁","🚂","🏎️","🦁","🐘","🦒","🦖","🦕","🐸","🎈","🌈","🍦","🍭","🎨","🐎","🦄","🐶","🐱","🛸"];
 
-        function unlockAndStart() {
-            if (unlocked) return;
-            const ids = ['s-bg', 's-splash', 's-choice', 's-spin', 's-win', 's-fail', 's-jackpot'];
-            ids.forEach(id => {
-                const a = document.getElementById(id);
-                a.play().then(() => { a.pause(); a.currentTime = 0; });
-            });
-            unlocked = true;
+        function unlockAudio() {
+            if (audioStarted) return;
+            const audios = document.querySelectorAll('audio');
+            audios.forEach(a => { a.play(); a.pause(); });
             document.getElementById('s-bg').play();
-            quickPlay('s-splash');
+            forcePlay('s-splash');
+            audioStarted = true;
             flow('choice');
         }
 
         function flow(scr) {
             document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
-            const target = document.getElementById('scr-' + scr);
-            target.style.display = 'flex';
-            target.classList.add('active');
-            document.getElementById('border-overlay').className = ""; 
-            if(scr === 'game') startSpin();
+            document.getElementById('scr-' + scr).style.display = 'flex';
+            document.getElementById('border-overlay').className = "";
         }
 
-        function quickPlay(id) {
+        function forcePlay(id) {
             const a = document.getElementById(id);
             a.currentTime = 0;
-            a.play();
+            a.play().catch(()=>{});
         }
 
         function pick(e) {
-            userGuess = (e.clientY < window.innerHeight / 2) ? "mama" : "baba";
-            quickPlay('s-choice');
+            userGuess = (e.clientY < window.innerHeight / 2) ? "baba" : "mama";
+            forcePlay('s-choice');
             flow('ready');
+            document.getElementById('spin-btn').classList.remove('spin-shrink');
+        }
+
+        function startTheGame() {
+            document.getElementById('spin-btn').classList.add('spin-shrink');
+            setTimeout(() => { flow('game'); startSpin(); }, 500);
         }
 
         function startSpin() {
@@ -105,7 +116,7 @@
             const timer = setInterval(() => {
                 let t = Math.random() > 0.5 ? "mama" : "baba";
                 document.getElementById('pic').src = t + (Math.floor(Math.random()*10)+1) + ".jpg";
-                quickPlay('s-spin');
+                forcePlay('s-spin');
                 if(++count > 15) { clearInterval(timer); finish(); }
             }, 100);
         }
@@ -116,36 +127,35 @@
             let resultType = isJP ? "babamama" : (Math.random() > 0.5 ? "mama" : "baba");
             document.getElementById('pic').src = isJP ? "babamama.jpg" : resultType + (Math.floor(Math.random()*10)+1) + ".jpg";
 
+            // NEON HIGHLIGHT ON RESULT
+            const overlay = document.getElementById('border-overlay');
+            if(isJP) overlay.className = "neon-jackpot";
+            else overlay.className = (resultType === "mama" ? "neon-purple" : "neon-yellow");
+
+            // 3 SECOND PAUSE TO LOOK
             setTimeout(() => {
                 if(isJP || resultType === userGuess) {
                     if(isJP) { spinCount = 0; jackpotGoal = Math.floor(Math.random()*4)+3; }
                     doWin(isJP, resultType);
                 } else { doFail(); }
-            }, 1000);
+            }, 3000);
         }
 
         function doWin(jp, type) {
-            const b = document.getElementById('border-overlay');
+            flow('win');
             if(jp) {
-                b.className = "b-rainbow";
-                quickPlay('s-jackpot');
-                score += 3;
-                for(let i=0; i<80; i++) spawn(true, ["🍌","👩","🌟","✨"]);
+                forcePlay('s-jackpot');
+                for(let i=0; i<80; i++) spawn(true, ["🪙","🌟","✨"]);
             } else {
-                b.className = (type === 'mama' ? 'b-purple' : 'b-yellow');
-                quickPlay('s-win');
-                score += 1;
+                forcePlay('s-win');
                 for(let i=0; i<40; i++) spawn(false, type === "mama" ? ["👩","❤️"] : ["🍌","💛"]);
             }
-            if(score > 12) score = 1; 
-            document.getElementById('score-bar').innerText = "🍌".repeat(score);
-            flow('win');
             setTimeout(() => flow('choice'), 4000);
         }
 
         function doFail() {
             flow('fail');
-            quickPlay('s-fail');
+            forcePlay('s-fail');
             for(let i=0; i<40; i++) spawn(false, [bucket[Math.floor(Math.random()*bucket.length)]]);
             setTimeout(() => flow('choice'), 3000);
         }
@@ -156,7 +166,6 @@
             el.innerText = list[Math.floor(Math.random()*list.length)];
             el.style.fontSize = (Math.random() * 70 + 30) + "px";
             document.body.appendChild(el);
-
             let x, y, vx, vy;
             if(isFirework) {
                 x = window.innerWidth / 2; y = window.innerHeight / 2;
@@ -169,7 +178,6 @@
                 vx = (Math.random() - 0.5) * 10;
                 vy = -(Math.random() * 20 + 10);
             }
-
             let rot = 0, rotS = (Math.random()-0.5) * 20;
             const anim = setInterval(() => {
                 x += vx; y += vy; vy += 0.8; rot += rotS;
