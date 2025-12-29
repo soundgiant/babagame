@@ -3,124 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Baba Mama Arcade (Debug)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
+    <title>Baba Mama Arcade</title>
     <style>
         body, html { 
             margin: 0; padding: 0; width: 100%; height: 100%; 
-            overflow: hidden; background: #000; font-family: sans-serif;
-            touch-action: manipulation;
+            overflow: hidden; background: #000; font-family: -apple-system, sans-serif;
+            touch-action: manipulation; -webkit-tap-highlight-color: transparent;
         }
-        /* VISUAL DEBUGGER - TELLS US WHAT IS WRONG */
-        #debug-console {
-            position: absolute; top: 0; left: 0; width: 100%; 
-            background: rgba(255, 0, 0, 0.8); color: white; 
-            font-size: 12px; z-index: 9999; pointer-events: none;
-            padding: 5px; font-family: monospace;
-        }
-
         .screen { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
         .active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        
+        #border-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 5000; border: 0px solid transparent; }
+        .neon-jackpot { border: 20px solid #fff; animation: jFlash 0.2s infinite; }
+        @keyframes jFlash { 0% { border-color: red; } 50% { border-color: cyan; } 100% { border-color: yellow; } }
         img.full { width: 100%; height: 100%; object-fit: cover; }
         .game-photo { width: 100%; height: 100%; object-fit: contain; background: #fff; }
-        
-        /* Simple animations */
-        .neon-jackpot { border: 20px solid #fff; animation: flash 0.2s infinite; }
-        @keyframes flash { 0% { border-color: red; } 50% { border-color: cyan; } 100% { border-color: yellow; } }
-        
-        #spin-btn { width: 100%; height: 100%; object-fit: cover; transition: transform 1s; }
-        .spin-action { transform: rotate(1080deg) scale(0); }
-        .emoji { position: absolute; font-size: 50px; pointer-events: none; z-index: 4000; }
+        #spin-btn { width: 100%; height: 100%; object-fit: cover; transition: transform 0.8s ease-in-out; }
+        .spin-action { transform: scale(0) rotate(720deg); }
+        .emoji { position: absolute; pointer-events: none; z-index: 4000; font-size: 50px; }
     </style>
 </head>
-<body>
+<body onclick="bootAudio()">
 
-    <div id="debug-console">Waiting for user interaction...</div>
-
-    <div id="scr-splash" class="screen active" onclick="initAudio()"><img src="splash.jpg" class="full"></div>
+    <div id="border-overlay"></div>
+    <div id="scr-splash" class="screen active"><img src="splash.jpg" class="full"></div>
     <div id="scr-choice" class="screen" onclick="pick(event)"><img src="choice.jpg" class="full"></div>
-    <div id="scr-ready" class="screen"><img src="spin.jpg" id="spin-btn" onclick="startGame()"></div>
+    <div id="scr-ready" class="screen"><img src="spin.jpg" id="spin-btn" onclick="startTheGame()"></div>
     <div id="scr-game" class="screen" onclick="checkResult()"><img id="pic" class="game-photo" src="baba1.jpg"></div>
     <div id="scr-win" class="screen"><img src="win.jpg" class="full"></div>
     <div id="scr-fail" class="screen"><img src="tryagain.jpg" class="full"></div>
 
     <script>
-        // --- LOGGING HELPER ---
-        function log(msg) {
-            document.getElementById('debug-console').innerText = msg;
-            console.log(msg);
-        }
+        // --- AUDIO ENGINE ---
+        // Switch your .wav files to .mp3 and this will be buttery smooth!
+        var sounds = {
+            bg:      new Howl({ src: ['music.mp3'], loop: true, volume: 0.4, html5: true }),
+            splash:  new Howl({ src: ['splash.mp3'] }),
+            choice:  new Howl({ src: ['choice.mp3'] }),
+            jackpot: new Howl({ src: ['jackpot.mp3'] }),
+            win:     new Howl({ src: ['win.mp3'] }),
+            fail:    new Howl({ src: ['fail.mp3'] }),
+            spin:    new Howl({ src: ['spin.mp3'] }) // Added the spin sound
+        };
 
-        // --- AUDIO SETUP ---
-        var sounds = {};
-        
-        function loadSounds() {
-            log("Loading sounds...");
-            
-            // 1. BACKGROUND MUSIC (Use html5: true for streaming on low-end phones)
-            sounds.bg = new Howl({
-                src: ['music.mp3'],
-                html5: true, // IMPORTANT: Streams from disk, doesn't eat RAM
-                loop: true,
-                volume: 0.5,
-                onload: function() { log("Music Loaded OK"); },
-                onloaderror: function(id, err) { log("Music Error: " + err); }
-            });
+        let userGuess = "", spinCount = 0, audioUnlocked = false, isSpinning = false, currentResult = null;
+        let jackpotGoal = Math.floor(Math.random() * 4) + 3;
 
-            // 2. SFX Helper
-            // We use a simple function to create the others to save space
-            const makeSFX = (name) => {
-                return new Howl({
-                    src: [name + '.mp3'],
-                    onload: function() { log(name + " Loaded"); },
-                    onloaderror: function(id, err) { log("Error loading " + name + ": Check filename!"); }
-                });
-            };
-
-            sounds.splash  = makeSFX('splash');
-            sounds.choice  = makeSFX('choice');
-            sounds.jackpot = makeSFX('jackpot');
-            sounds.win     = makeSFX('win');
-            sounds.fail    = makeSFX('fail');
-        }
-
-        // Run load immediately
-        loadSounds();
-
-        // --- GAME VARIABLES ---
-        let deck = [];
-        let spinCount = 0;
-        let jackpotGoal = 4;
-        let currentResult = null;
-        let userGuess = "";
-        let isSpinning = false;
-        
-        // --- FLOW CONTROL ---
-        function flow(id) {
-            document.querySelectorAll('.screen').forEach(el => el.style.display = 'none');
-            document.getElementById('scr-' + id).style.display = 'flex';
-        }
-
-        function initAudio() {
-            log("Attempting Audio Unlock...");
-            
-            // Try to play everything silently to unlock the audio engine
-            if(Howler.ctx && Howler.ctx.state === 'suspended') {
-                Howler.ctx.resume().then(() => {
-                    log("Audio Context Resumed!");
-                    playMusic();
-                });
-            } else {
-                playMusic();
-            }
-        }
-
-        function playMusic() {
+        function bootAudio() {
+            if (audioUnlocked) return;
             sounds.bg.play();
             sounds.splash.play();
+            audioUnlocked = true;
             flow('choice');
-            log("Game Started - Audio should be on");
+        }
+
+        function flow(scr) {
+            document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
+            document.getElementById('scr-' + scr).style.display = 'flex';
+            document.getElementById('border-overlay').className = "";
         }
 
         function pick(e) {
@@ -130,79 +70,50 @@
             document.getElementById('spin-btn').classList.remove('spin-action');
         }
 
-        function startGame() {
+        function startTheGame() {
             document.getElementById('spin-btn').classList.add('spin-action');
-            setTimeout(() => {
-                flow('game');
-                startSpin();
-            }, 1000);
-        }
-
-        function refreshDeck() {
-            deck = [];
-            for(let i=1; i<=10; i++) { deck.push("baba"+i+".jpg"); deck.push("mama"+i+".jpg"); }
-            deck.sort(() => Math.random() - 0.5);
+            sounds.spin.play();
+            setTimeout(() => { flow('game'); startSpin(); }, 800);
         }
 
         function startSpin() {
-            if(deck.length < 5) refreshDeck();
             isSpinning = true;
             let count = 0;
-            const timer = setInterval(() => {
+            const deck = [];
+            for(let i=1; i<=10; i++) { deck.push("baba"+i+".jpg", "mama"+i+".jpg"); }
+            
+            const shuffleInterval = setInterval(() => {
                 document.getElementById('pic').src = deck[Math.floor(Math.random() * deck.length)];
-                if(++count > 30) {
-                    clearInterval(timer);
+                if(++count > 25) { // Faster spin for SE performance
+                    clearInterval(shuffleInterval);
                     isSpinning = false;
-                    calcResult();
+                    prepareResult();
                 }
-            }, 100);
+            }, 80);
         }
 
-        function calcResult() {
+        function prepareResult() {
             spinCount++;
             let isJP = (spinCount >= jackpotGoal);
-            let img = isJP ? "babamama.jpg" : deck.pop();
-            let isMama = img.includes("mama");
-            
-            document.getElementById('pic').src = img;
-            currentResult = { isJP, isMama };
-            
-            // Visual pulse
-            document.getElementById('pic').style.border = isJP ? "20px solid gold" : "none";
+            let res = isJP ? "babamama.jpg" : (Math.random() > 0.5 ? "baba1.jpg" : "mama1.jpg");
+            document.getElementById('pic').src = res;
+            currentResult = { isJP, isMama: res.includes("mama") };
+            if(isJP) document.getElementById('border-overlay').className = "neon-jackpot";
         }
 
         function checkResult() {
-            if(isSpinning || !currentResult) return;
-            
+            if (isSpinning || !currentResult) return;
             let won = currentResult.isJP || (currentResult.isMama && userGuess === "mama") || (!currentResult.isMama && userGuess === "baba");
-            
             if(won) {
-                if(currentResult.isJP) { spinCount = 0; jackpotGoal = Math.floor(Math.random()*4)+3; }
                 flow('win');
-                if(currentResult.isJP) sounds.jackpot.play();
-                else sounds.win.play();
-                spawnEmojis(true);
+                if(currentResult.isJP) { sounds.jackpot.play(); spinCount = 0; } 
+                else { sounds.win.play(); }
             } else {
                 flow('fail');
                 sounds.fail.play();
-                spawnEmojis(false);
             }
-            
-            setTimeout(() => flow('choice'), 4000);
             currentResult = null;
-        }
-        
-        function spawnEmojis(win) {
-            // Simplified emoji spawner for performance
-            for(let i=0; i<20; i++) {
-                let el = document.createElement('div');
-                el.className = 'emoji';
-                el.innerText = win ? "🌟" : "💩";
-                el.style.left = Math.random() * window.innerWidth + 'px';
-                el.style.top = Math.random() * window.innerHeight + 'px';
-                document.body.appendChild(el);
-                setTimeout(() => el.remove(), 1000);
-            }
+            setTimeout(() => flow('choice'), 3500);
         }
     </script>
 </body>
