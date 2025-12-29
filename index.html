@@ -6,7 +6,7 @@
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Mama Baba Arcade</title>
+    <meta name="apple-mobile-web-app-title" content="Mama Baba">
 
     <style>
         body, html { 
@@ -15,20 +15,20 @@
             touch-action: manipulation;
         }
 
-        /* THE BORDER LAYER - Sits on top of everything */
-        #border-layer {
+        /* The Glass Border Layer */
+        #border-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 2000; box-sizing: border-box;
-            border: 0px solid transparent; transition: border 0.1s;
+            pointer-events: none; z-index: 5000; box-sizing: border-box;
+            border: 0px solid transparent; 
         }
 
-        .screen { display: none; width: 100%; height: 100%; position: absolute; }
+        .screen { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
         .active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
         
-        /* Border Classes */
+        /* High-Visibility Safari Borders */
         .b-yellow { border: 25px solid #FFDE59 !important; }
         .b-purple { border: 25px solid #A020F0 !important; }
-        .b-rainbow { border: 25px solid red !important; animation: rAni 0.2s infinite; }
+        .b-rainbow { border: 25px solid red !important; animation: rAni 0.3s infinite; }
         @keyframes rAni { 0% {filter: hue-rotate(0deg);} 100% {filter: hue-rotate(360deg);} }
 
         img.full { width: 100%; height: 100%; object-fit: cover; }
@@ -38,12 +38,12 @@
         @keyframes pulse { 0% {transform: scale(1);} 50% {transform: scale(1.03);} 100% {transform: scale(1);} }
 
         .emoji { position: absolute; pointer-events: none; z-index: 999; }
-        #score-bar { position: absolute; top: 50px; left: 30px; font-size: 35px; z-index: 1000; }
+        #score-bar { position: absolute; top: 60px; left: 30px; font-size: 35px; z-index: 6000; }
     </style>
 </head>
-<body onclick="startAudioOnFirstTouch()">
+<body onclick="unlockAndStart()">
 
-    <div id="border-layer"></div>
+    <div id="border-overlay"></div>
     <div id="score-bar"></div>
 
     <div id="scr-splash" class="screen active"><img src="splash.jpg" class="full"></div>
@@ -62,20 +62,20 @@
     <audio id="s-jackpot" src="jackpot.mp3" playsinline></audio>
 
     <script>
-        let score = 0, userGuess = "", spinCount = 0, audioUnlocked = false;
+        let score = 0, userGuess = "", spinCount = 0, unlocked = false;
         let jackpotGoal = Math.floor(Math.random() * 4) + 3;
         const bucket = ["🚒","🚜","🚀","🚁","🚂","🏎️","🦁","🐘","🦒","🦖","🦕","🐸","🎈","🌈","🍦","🍭","🎨","🐎","🦄","🐶","🐱","🍎","🍕","🛸"];
 
-        function startAudioOnFirstTouch() {
-            if (audioUnlocked) return;
-            const sounds = ['s-bg', 's-splash', 's-choice', 's-spin', 's-win', 's-fail', 's-jackpot'];
-            sounds.forEach(id => {
+        function unlockAndStart() {
+            if (unlocked) return;
+            const ids = ['s-bg', 's-splash', 's-choice', 's-spin', 's-win', 's-fail', 's-jackpot'];
+            ids.forEach(id => {
                 const a = document.getElementById(id);
-                a.play(); a.pause(); a.currentTime = 0;
+                a.play().then(() => { a.pause(); a.currentTime = 0; });
             });
-            audioUnlocked = true;
+            unlocked = true;
             document.getElementById('s-bg').play();
-            forcePlay('s-splash');
+            quickPlay('s-splash');
             flow('choice');
         }
 
@@ -84,13 +84,11 @@
             const target = document.getElementById('scr-' + scr);
             target.style.display = 'flex';
             target.classList.add('active');
-            
-            // Reset borders when moving screens
-            document.getElementById('border-layer').className = "";
+            document.getElementById('border-overlay').className = ""; 
             if(scr === 'game') startSpin();
         }
 
-        function forcePlay(id) {
+        function quickPlay(id) {
             const a = document.getElementById(id);
             a.currentTime = 0;
             a.play();
@@ -98,7 +96,7 @@
 
         function pick(e) {
             userGuess = (e.clientY < window.innerHeight / 2) ? "mama" : "baba";
-            forcePlay('s-choice');
+            quickPlay('s-choice');
             flow('ready');
         }
 
@@ -107,7 +105,7 @@
             const timer = setInterval(() => {
                 let t = Math.random() > 0.5 ? "mama" : "baba";
                 document.getElementById('pic').src = t + (Math.floor(Math.random()*10)+1) + ".jpg";
-                forcePlay('s-spin');
+                quickPlay('s-spin');
                 if(++count > 15) { clearInterval(timer); finish(); }
             }, 100);
         }
@@ -127,15 +125,15 @@
         }
 
         function doWin(jp, type) {
-            const b = document.getElementById('border-layer');
+            const b = document.getElementById('border-overlay');
             if(jp) {
                 b.className = "b-rainbow";
-                forcePlay('s-jackpot');
+                quickPlay('s-jackpot');
                 score += 3;
                 for(let i=0; i<80; i++) spawn(true, ["🍌","👩","🌟","✨"]);
             } else {
                 b.className = (type === 'mama' ? 'b-purple' : 'b-yellow');
-                forcePlay('s-win');
+                quickPlay('s-win');
                 score += 1;
                 for(let i=0; i<40; i++) spawn(false, type === "mama" ? ["👩","❤️"] : ["🍌","💛"]);
             }
@@ -147,7 +145,7 @@
 
         function doFail() {
             flow('fail');
-            forcePlay('s-fail');
+            quickPlay('s-fail');
             for(let i=0; i<40; i++) spawn(false, [bucket[Math.floor(Math.random()*bucket.length)]]);
             setTimeout(() => flow('choice'), 3000);
         }
@@ -169,14 +167,12 @@
                 x = Math.random() * window.innerWidth;
                 y = window.innerHeight + 50;
                 vx = (Math.random() - 0.5) * 10;
-                vy = -(Math.random() * 20 + 10); // HEAVIER LAUNCH
+                vy = -(Math.random() * 20 + 10);
             }
 
             let rot = 0, rotS = (Math.random()-0.5) * 20;
             const anim = setInterval(() => {
-                x += vx; y += vy; 
-                vy += 0.8; // STRONGER GRAVITY (heavier fall)
-                rot += rotS;
+                x += vx; y += vy; vy += 0.8; rot += rotS;
                 el.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${rot}deg)`;
                 if(y > window.innerHeight + 200 || x < -200 || x > window.innerWidth + 200) {
                     clearInterval(anim); el.remove();
@@ -186,4 +182,3 @@
     </script>
 </body>
 </html>
-
