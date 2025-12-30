@@ -16,7 +16,6 @@
         
         #border-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 5000; border: 0px solid transparent; }
 
-        /* DOUBLE INTENSITY NEON PULSE */
         .neon-yellow { border: 35px solid #FFDE59; animation: pulseY 0.5s infinite alternate; }
         @keyframes pulseY { 
             from { box-shadow: inset 0 0 30px #FFDE59, 0 0 30px #FFDE59; border-color: #FFDE59; } 
@@ -39,7 +38,6 @@
         img.full { width: 100%; height: 100%; object-fit: cover; }
         .game-photo { width: 100%; height: 100%; object-fit: contain; background: #fff; }
         
-        /* SPIN ANIMATION FIX */
         #spin-btn { 
             width: 100%; height: 100%; object-fit: cover; 
             transition: transform 1.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.8s; 
@@ -49,7 +47,7 @@
         .emoji { position: absolute; pointer-events: none; z-index: 6000; font-size: 60px; }
     </style>
 </head>
-<body onclick="bootAudio()">
+<body onclick="handleGlobalTap(event)">
 
     <div id="border-overlay"></div>
 
@@ -65,7 +63,7 @@
         var sounds = {
             bg:      new Howl({ src: ['music.mp3'], loop: true, volume: 0.3, html5: true }),
             splash:  new Howl({ src: ['splash.mp3'] }),
-            choice:  new Howl({ src: ['choice.mp3'] }),
+            choice:  new Howl({ src: ['choice.mp3'], volume: 0.8 }),
             jackpot: new Howl({ src: ['jackpot.mp3'] }),
             win:     new Howl({ src: ['win.mp3'] }),
             fail:    new Howl({ src: ['fail.mp3'] }),
@@ -76,8 +74,16 @@
         let jackpotGoal = Math.floor(Math.random() * 4) + 3;
         const bucket = ["🚒","🚜","🚀","🛸","🦁","🐘","🐸","🍦","🌈","🦄","🐶","🐱","🍎","🍕","🪙"];
 
+        // Global Tap Handler for "Choice" sound on every tap
+        function handleGlobalTap(e) {
+            if (!audioUnlocked) {
+                bootAudio();
+            } else {
+                sounds.choice.play();
+            }
+        }
+
         function bootAudio() {
-            if (audioUnlocked) return;
             sounds.bg.play();
             sounds.splash.play();
             audioUnlocked = true;
@@ -91,8 +97,8 @@
         }
 
         function pick(e) {
+            // Calculate choice before the global tap handler resets things
             userGuess = (e.clientY < window.innerHeight / 2) ? "baba" : "mama";
-            sounds.choice.play();
             flow('ready');
             const btn = document.getElementById('spin-btn');
             btn.classList.remove('spin-action');
