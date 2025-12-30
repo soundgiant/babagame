@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="apple-touch-icon" href="icon.png"> <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
     <title>Baba Mama Arcade</title>
     <style>
         body, html { 
@@ -16,34 +20,36 @@
         
         #border-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 5000; border: 0px solid transparent; }
 
-        .neon-yellow { border: 35px solid #FFDE59; animation: pulseY 0.5s infinite alternate; }
-        @keyframes pulseY { 
-            from { box-shadow: inset 0 0 30px #FFDE59, 0 0 30px #FFDE59; border-color: #FFDE59; } 
-            to { box-shadow: inset 0 0 120px #FFDE59, 0 0 80px #FFDE59; border-color: #FFF000; } 
+        /* RGB GLOW FOR JACKPOT */
+        .neon-rgb { 
+            border: 35px solid #fff; 
+            animation: rgbGlow 0.3s infinite linear;
         }
+        @keyframes rgbGlow {
+            0% { border-color: #ff0000; box-shadow: inset 0 0 40px #ff0000, 0 0 100px #ff0000; }
+            33% { border-color: #00ff00; box-shadow: inset 0 0 40px #00ff00, 0 0 100px #00ff00; }
+            66% { border-color: #0000ff; box-shadow: inset 0 0 40px #0000ff, 0 0 100px #0000ff; }
+            100% { border-color: #ff0000; box-shadow: inset 0 0 40px #ff0000, 0 0 100px #ff0000; }
+        }
+
+        .neon-yellow { border: 35px solid #FFDE59; animation: pulseY 0.5s infinite alternate; }
+        @keyframes pulseY { from { box-shadow: inset 0 0 30px #FFDE59; } to { box-shadow: inset 0 0 120px #FFDE59; } }
 
         .neon-purple { border: 35px solid #A020F0; animation: pulseP 0.5s infinite alternate; }
-        @keyframes pulseP { 
-            from { box-shadow: inset 0 0 30px #A020F0, 0 0 30px #A020F0; border-color: #A020F0; } 
-            to { box-shadow: inset 0 0 120px #A020F0, 0 0 80px #A020F0; border-color: #D020FF; } 
-        }
-
-        .neon-jackpot { border: 35px solid #fff; animation: jFlash 0.15s infinite; }
-        @keyframes jFlash { 
-            0% { border-color: red; box-shadow: 0 0 100px red; } 
-            33% { border-color: cyan; box-shadow: 0 0 100px cyan; } 
-            66% { border-color: yellow; box-shadow: 0 0 100px yellow; } 
-        }
+        @keyframes pulseP { from { box-shadow: inset 0 0 30px #A020F0; } to { box-shadow: inset 0 0 120px #A020F0; } }
 
         img.full { width: 100%; height: 100%; object-fit: cover; }
         .game-photo { width: 100%; height: 100%; object-fit: contain; background: #fff; }
         
+        /* SPIN TRANSITION */
+        #pic { transition: transform 0.5s ease-in-out; }
+        .spinning-photo { transform: rotate(360deg) scale(0.8); }
+
         #spin-btn { 
             width: 100%; height: 100%; object-fit: cover; 
-            transition: transform 1.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.8s; 
+            transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s; 
         }
-        .spin-action { transform: scale(0) rotate(1080deg) !important; opacity: 0; }
-
+        .spin-action { transform: scale(0) rotate(720deg); opacity: 0; }
         .emoji { position: absolute; pointer-events: none; z-index: 6000; font-size: 60px; }
     </style>
 </head>
@@ -53,34 +59,29 @@
 
     <div id="scr-splash" class="screen active"><img src="splash.jpg" class="full"></div>
     <div id="scr-choice" class="screen" onclick="pick(event)"><img src="choice.jpg" class="full"></div>
-    <div id="scr-ready" class="screen"><img src="spin.jpg" id="spin-btn" onclick="startTheGame()"></div>
-    
+    <div id="scr-ready" class="screen"><img src="spin.jpg" id="spin-btn" onclick="startTheGame(event)"></div>
     <div id="scr-game" class="screen" onclick="checkResult()"><img id="pic" class="game-photo" src="baba1.jpg"></div>
     <div id="scr-win" class="screen" onclick="flow('choice')"><img src="win.jpg" class="full"></div>
     <div id="scr-fail" class="screen" onclick="flow('choice')"><img src="tryagain.jpg" class="full"></div>
 
     <script>
         var sounds = {
-            bg:      new Howl({ src: ['music.mp3'], loop: true, volume: 0.3, html5: true }),
-            splash:  new Howl({ src: ['splash.mp3'] }),
-            choice:  new Howl({ src: ['choice.mp3'], volume: 0.8 }),
+            bg: new Howl({ src: ['music.mp3'], loop: true, volume: 0.3, html5: true }),
+            splash: new Howl({ src: ['splash.mp3'] }),
+            choice: new Howl({ src: ['choice.mp3'], volume: 0.6 }),
             jackpot: new Howl({ src: ['jackpot.mp3'] }),
-            win:     new Howl({ src: ['win.mp3'] }),
-            fail:    new Howl({ src: ['fail.mp3'] }),
-            spin:    new Howl({ src: ['spin.mp3'] })
+            win: new Howl({ src: ['win.mp3'] }),
+            fail: new Howl({ src: ['fail.mp3'] }),
+            spin: new Howl({ src: ['spin.mp3'] })
         };
 
         let userGuess = "", spinCount = 0, audioUnlocked = false, isSpinning = false, currentResult = null;
-        let jackpotGoal = Math.floor(Math.random() * 4) + 3;
-        const bucket = ["🚒","🚜","🚀","🛸","🦁","🐘","🐸","🍦","🌈","🦄","🐶","🐱","🍎","🍕","🪙"];
+        let lastTwo = []; // To prevent 3 in a row
+        let jackpotGoal = Math.floor(Math.random() * 3) + 3; 
 
-        // Global Tap Handler for "Choice" sound on every tap
         function handleGlobalTap(e) {
-            if (!audioUnlocked) {
-                bootAudio();
-            } else {
-                sounds.choice.play();
-            }
+            if (!audioUnlocked) { bootAudio(); } 
+            else { sounds.choice.play(); }
         }
 
         function bootAudio() {
@@ -94,10 +95,10 @@
             document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
             document.getElementById('scr-' + scr).style.display = 'flex';
             document.getElementById('border-overlay').className = "";
+            document.getElementById('pic').classList.remove('spinning-photo');
         }
 
         function pick(e) {
-            // Calculate choice before the global tap handler resets things
             userGuess = (e.clientY < window.innerHeight / 2) ? "baba" : "mama";
             flow('ready');
             const btn = document.getElementById('spin-btn');
@@ -106,20 +107,20 @@
             btn.style.transform = "scale(1) rotate(0deg)";
         }
 
-        function startTheGame() {
+        function startTheGame(e) {
+            e.stopPropagation();
             document.getElementById('spin-btn').classList.add('spin-action');
             sounds.spin.play();
-            setTimeout(() => { flow('game'); startSpin(); }, 1100);
+            setTimeout(() => { flow('game'); startSpin(); }, 600);
         }
 
         function startSpin() {
             isSpinning = true;
+            document.getElementById('pic').classList.add('spinning-photo');
             let count = 0;
-            const deck = [];
-            for(let i=1; i<=10; i++) { deck.push("baba"+i+".jpg", "mama"+i+".jpg"); }
-            
             const shuffleInterval = setInterval(() => {
-                document.getElementById('pic').src = deck[Math.floor(Math.random() * deck.length)];
+                let tempType = Math.random() > 0.5 ? "baba" : "mama";
+                document.getElementById('pic').src = tempType + (Math.floor(Math.random()*10)+1) + ".jpg";
                 if(++count > 40) { 
                     clearInterval(shuffleInterval);
                     isSpinning = false;
@@ -131,15 +132,30 @@
         function prepareResult() {
             spinCount++;
             let isJP = (spinCount >= jackpotGoal);
-            let resultFile = isJP ? "babamama.jpg" : (Math.random() > 0.5 ? "baba"+(Math.floor(Math.random()*10)+1)+".jpg" : "mama"+(Math.floor(Math.random()*10)+1)+".jpg");
-            
-            document.getElementById('pic').src = resultFile;
-            let isMama = resultFile.includes("mama");
-            currentResult = { isJP, isMama };
+            let finalType;
 
+            if (isJP) {
+                finalType = "jackpot";
+            } else {
+                // ANTI-REPEAT LOGIC: If last two were same, force the other
+                if (lastTwo.length === 2 && lastTwo[0] === lastTwo[1]) {
+                    finalType = (lastTwo[0] === "baba") ? "mama" : "baba";
+                } else {
+                    finalType = Math.random() > 0.5 ? "baba" : "mama";
+                }
+            }
+
+            lastTwo.push(finalType);
+            if (lastTwo.length > 2) lastTwo.shift();
+
+            let resultFile = isJP ? "babamama.jpg" : finalType + (Math.floor(Math.random()*10)+1) + ".jpg";
+            document.getElementById('pic').src = resultFile;
+            document.getElementById('pic').classList.remove('spinning-photo');
+            
+            currentResult = { isJP, isMama: resultFile.includes("mama") };
             const overlay = document.getElementById('border-overlay');
-            if(isJP) overlay.className = "neon-jackpot";
-            else overlay.className = isMama ? "neon-purple" : "neon-yellow";
+            if(isJP) overlay.className = "neon-rgb";
+            else overlay.className = currentResult.isMama ? "neon-purple" : "neon-yellow";
         }
 
         function checkResult() {
@@ -151,17 +167,17 @@
                 if(currentResult.isJP) { 
                     sounds.jackpot.play(); 
                     spinCount = 0; 
-                    jackpotGoal = Math.floor(Math.random() * 4) + 3;
-                    for(let i=0; i<80; i++) spawn(true, ["🪙","🌟","✨"]);
+                    jackpotGoal = Math.floor(Math.random() * 3) + 3;
+                    for(let i=0; i<80; i++) spawn(true, ["👩","🍌","✨","🥳","❤️"]); // Baba-Mama Win emojis
                 } else { 
                     sounds.win.play(); 
-                    let winEmojis = currentResult.isMama ? ["👩","❤️"] : ["🍌","💛"];
+                    let winEmojis = currentResult.isMama ? ["👩","❤️","✨"] : ["🍌","💛","✨"];
                     for(let i=0; i<40; i++) spawn(false, winEmojis);
                 }
             } else {
                 flow('fail');
                 sounds.fail.play();
-                for(let i=0; i<40; i++) spawn(false, bucket);
+                for(let i=0; i<40; i++) spawn(false, ["🚒","🚜","🚀","🛸","🦁","🐘","🐸","🍦"]);
             }
             currentResult = null;
         }
@@ -171,19 +187,10 @@
             el.className = 'emoji';
             el.innerText = list[Math.floor(Math.random()*list.length)];
             document.body.appendChild(el);
-
-            let x = Math.random() * window.innerWidth;
-            let y = window.innerHeight + 50;
-            let vx = (Math.random() - 0.5) * 15;
-            let vy = -(Math.random() * 20 + 15);
-
-            if(isJackpot) {
-                x = window.innerWidth / 2;
-                y = window.innerHeight / 2;
-                vx = (Math.random() - 0.5) * 40;
-                vy = (Math.random() - 0.5) * 40;
-            }
-
+            let x = isJackpot ? window.innerWidth/2 : Math.random()*window.innerWidth;
+            let y = isJackpot ? window.innerHeight/2 : window.innerHeight+50;
+            let vx = (Math.random()-0.5)*(isJackpot?40:15);
+            let vy = isJackpot ? (Math.random()-0.5)*40 : -(Math.random()*20+15);
             let rot = 0;
             const anim = setInterval(() => {
                 x += vx; y += vy; vy += 0.8; rot += 10;
