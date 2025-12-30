@@ -16,37 +16,37 @@
         
         #border-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 5000; border: 0px solid transparent; }
 
-        /* TWICE THE GLOW / PULSE */
-        .neon-yellow { border: 30px solid #FFDE59; animation: pulseY 0.6s infinite alternate; }
+        /* DOUBLE INTENSITY NEON PULSE */
+        .neon-yellow { border: 35px solid #FFDE59; animation: pulseY 0.5s infinite alternate; }
         @keyframes pulseY { 
-            from { box-shadow: inset 0 0 20px #FFDE59, 0 0 20px #FFDE59; } 
-            to { box-shadow: inset 0 0 100px #FFDE59, 0 0 60px #FFDE59; } 
+            from { box-shadow: inset 0 0 30px #FFDE59, 0 0 30px #FFDE59; border-color: #FFDE59; } 
+            to { box-shadow: inset 0 0 120px #FFDE59, 0 0 80px #FFDE59; border-color: #FFF000; } 
         }
 
-        .neon-purple { border: 30px solid #A020F0; animation: pulseP 0.6s infinite alternate; }
+        .neon-purple { border: 35px solid #A020F0; animation: pulseP 0.5s infinite alternate; }
         @keyframes pulseP { 
-            from { box-shadow: inset 0 0 20px #A020F0, 0 0 20px #A020F0; } 
-            to { box-shadow: inset 0 0 100px #A020F0, 0 0 60px #A020F0; } 
+            from { box-shadow: inset 0 0 30px #A020F0, 0 0 30px #A020F0; border-color: #A020F0; } 
+            to { box-shadow: inset 0 0 120px #A020F0, 0 0 80px #A020F0; border-color: #D020FF; } 
         }
 
-        .neon-jackpot { border: 30px solid #fff; animation: jFlash 0.15s infinite; }
+        .neon-jackpot { border: 35px solid #fff; animation: jFlash 0.15s infinite; }
         @keyframes jFlash { 
-            0% { border-color: red; box-shadow: 0 0 80px red; } 
-            33% { border-color: cyan; box-shadow: 0 0 80px cyan; } 
-            66% { border-color: yellow; box-shadow: 0 0 80px yellow; } 
+            0% { border-color: red; box-shadow: 0 0 100px red; } 
+            33% { border-color: cyan; box-shadow: 0 0 100px cyan; } 
+            66% { border-color: yellow; box-shadow: 0 0 100px yellow; } 
         }
 
         img.full { width: 100%; height: 100%; object-fit: cover; }
         .game-photo { width: 100%; height: 100%; object-fit: contain; background: #fff; }
         
-        #spin-btn { width: 100%; height: 100%; object-fit: cover; transition: transform 1.2s cubic-bezier(0.4, 0, 0.2, 1); }
-        .spin-action { transform: scale(0) rotate(1080deg); opacity: 0; }
+        /* SPIN ANIMATION FIX */
+        #spin-btn { 
+            width: 100%; height: 100%; object-fit: cover; 
+            transition: transform 1.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.8s; 
+        }
+        .spin-action { transform: scale(0) rotate(1080deg) !important; opacity: 0; }
 
         .emoji { position: absolute; pointer-events: none; z-index: 6000; font-size: 60px; }
-        
-        /* Tap Indicator Hint */
-        .tap-hint { position: absolute; bottom: 40px; color: white; font-weight: bold; text-shadow: 2px 2px 10px #000; font-size: 20px; animation: blink 1s infinite; }
-        @keyframes blink { 0% {opacity: 0.2;} 50% {opacity: 1;} 100% {opacity: 0.2;} }
     </style>
 </head>
 <body onclick="bootAudio()">
@@ -57,16 +57,11 @@
     <div id="scr-choice" class="screen" onclick="pick(event)"><img src="choice.jpg" class="full"></div>
     <div id="scr-ready" class="screen"><img src="spin.jpg" id="spin-btn" onclick="startTheGame()"></div>
     
-    <div id="scr-game" class="screen" onclick="checkResult()">
-        <img id="pic" class="game-photo" src="baba1.jpg">
-        <div class="tap-hint">TAP TO SEE!</div>
-    </div>
-    
-    <div id="scr-win" class="screen" onclick="flow('choice')"><img src="win.jpg" class="full"><div class="tap-hint">TAP TO PLAY AGAIN</div></div>
-    <div id="scr-fail" class="screen" onclick="flow('choice')"><img src="tryagain.jpg" class="full"><div class="tap-hint">TAP TO TRY AGAIN</div></div>
+    <div id="scr-game" class="screen" onclick="checkResult()"><img id="pic" class="game-photo" src="baba1.jpg"></div>
+    <div id="scr-win" class="screen" onclick="flow('choice')"><img src="win.jpg" class="full"></div>
+    <div id="scr-fail" class="screen" onclick="flow('choice')"><img src="tryagain.jpg" class="full"></div>
 
     <script>
-        // --- AUDIO ENGINE (MP3 ONLY) ---
         var sounds = {
             bg:      new Howl({ src: ['music.mp3'], loop: true, volume: 0.3, html5: true }),
             splash:  new Howl({ src: ['splash.mp3'] }),
@@ -99,15 +94,16 @@
             userGuess = (e.clientY < window.innerHeight / 2) ? "baba" : "mama";
             sounds.choice.play();
             flow('ready');
-            document.getElementById('spin-btn').classList.remove('spin-action');
-            document.getElementById('spin-btn').style.opacity = "1";
-            document.getElementById('spin-btn').style.transform = "scale(1)";
+            const btn = document.getElementById('spin-btn');
+            btn.classList.remove('spin-action');
+            btn.style.opacity = "1";
+            btn.style.transform = "scale(1) rotate(0deg)";
         }
 
         function startTheGame() {
             document.getElementById('spin-btn').classList.add('spin-action');
             sounds.spin.play();
-            setTimeout(() => { flow('game'); startSpin(); }, 1000);
+            setTimeout(() => { flow('game'); startSpin(); }, 1100);
         }
 
         function startSpin() {
@@ -118,7 +114,7 @@
             
             const shuffleInterval = setInterval(() => {
                 document.getElementById('pic').src = deck[Math.floor(Math.random() * deck.length)];
-                if(++count > 40) { // 4 second dramatic spin
+                if(++count > 40) { 
                     clearInterval(shuffleInterval);
                     isSpinning = false;
                     prepareResult();
@@ -142,7 +138,6 @@
 
         function checkResult() {
             if (isSpinning || !currentResult) return;
-            
             let won = currentResult.isJP || (currentResult.isMama && userGuess === "mama") || (!currentResult.isMama && userGuess === "baba");
             
             if(won) {
@@ -176,11 +171,11 @@
             let vx = (Math.random() - 0.5) * 15;
             let vy = -(Math.random() * 20 + 15);
 
-            if(isJackpot) { // Center explosion for Jackpot
+            if(isJackpot) {
                 x = window.innerWidth / 2;
                 y = window.innerHeight / 2;
-                vx = (Math.random() - 0.5) * 30;
-                vy = (Math.random() - 0.5) * 30;
+                vx = (Math.random() - 0.5) * 40;
+                vy = (Math.random() - 0.5) * 40;
             }
 
             let rot = 0;
