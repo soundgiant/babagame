@@ -7,7 +7,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
-    <link rel="apple-touch-icon" href="icon.png"> <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
+    <link rel="apple-touch-icon" href="icon.png">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
     <title>Baba Mama Arcade</title>
     <style>
         body, html { 
@@ -20,7 +22,7 @@
         
         #border-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 5000; border: 0px solid transparent; }
 
-        /* RGB GLOW FOR JACKPOT */
+        /* RGB GLOW FOR BABA-MAMA WIN */
         .neon-rgb { 
             border: 35px solid #fff; 
             animation: rgbGlow 0.3s infinite linear;
@@ -41,15 +43,13 @@
         img.full { width: 100%; height: 100%; object-fit: cover; }
         .game-photo { width: 100%; height: 100%; object-fit: contain; background: #fff; }
         
-        /* SPIN TRANSITION */
-        #pic { transition: transform 0.5s ease-in-out; }
-        .spinning-photo { transform: rotate(360deg) scale(0.8); }
-
+        /* PROPELLER SPIN ANIMATION */
         #spin-btn { 
             width: 100%; height: 100%; object-fit: cover; 
             transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s; 
         }
-        .spin-action { transform: scale(0) rotate(720deg); opacity: 0; }
+        .spin-trigger { transform: scale(0) rotate(1080deg); opacity: 0; }
+
         .emoji { position: absolute; pointer-events: none; z-index: 6000; font-size: 60px; }
     </style>
 </head>
@@ -59,7 +59,7 @@
 
     <div id="scr-splash" class="screen active"><img src="splash.jpg" class="full"></div>
     <div id="scr-choice" class="screen" onclick="pick(event)"><img src="choice.jpg" class="full"></div>
-    <div id="scr-ready" class="screen"><img src="spin.jpg" id="spin-btn" onclick="startTheGame(event)"></div>
+    <div id="scr-ready" class="screen"><img src="spin.jpg" id="spin-btn" onclick="triggerSpinPropeller(event)"></div>
     <div id="scr-game" class="screen" onclick="checkResult()"><img id="pic" class="game-photo" src="baba1.jpg"></div>
     <div id="scr-win" class="screen" onclick="flow('choice')"><img src="win.jpg" class="full"></div>
     <div id="scr-fail" class="screen" onclick="flow('choice')"><img src="tryagain.jpg" class="full"></div>
@@ -76,7 +76,7 @@
         };
 
         let userGuess = "", spinCount = 0, audioUnlocked = false, isSpinning = false, currentResult = null;
-        let lastTwo = []; // To prevent 3 in a row
+        let lastTwo = []; 
         let jackpotGoal = Math.floor(Math.random() * 3) + 3; 
 
         function handleGlobalTap(e) {
@@ -95,28 +95,33 @@
             document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
             document.getElementById('scr-' + scr).style.display = 'flex';
             document.getElementById('border-overlay').className = "";
-            document.getElementById('pic').classList.remove('spinning-photo');
         }
 
         function pick(e) {
             userGuess = (e.clientY < window.innerHeight / 2) ? "baba" : "mama";
             flow('ready');
             const btn = document.getElementById('spin-btn');
-            btn.classList.remove('spin-action');
+            btn.classList.remove('spin-trigger');
             btn.style.opacity = "1";
             btn.style.transform = "scale(1) rotate(0deg)";
         }
 
-        function startTheGame(e) {
+        // 1. Spin the button first
+        function triggerSpinPropeller(e) {
             e.stopPropagation();
-            document.getElementById('spin-btn').classList.add('spin-action');
-            sounds.spin.play();
-            setTimeout(() => { flow('game'); startSpin(); }, 600);
+            const btn = document.getElementById('spin-btn');
+            btn.classList.add('spin-trigger');
+            
+            // 2. Wait for propeller to finish, then start sound and shuffle
+            setTimeout(() => {
+                sounds.spin.play();
+                flow('game');
+                startSpin();
+            }, 1000); 
         }
 
         function startSpin() {
             isSpinning = true;
-            document.getElementById('pic').classList.add('spinning-photo');
             let count = 0;
             const shuffleInterval = setInterval(() => {
                 let tempType = Math.random() > 0.5 ? "baba" : "mama";
@@ -137,7 +142,6 @@
             if (isJP) {
                 finalType = "jackpot";
             } else {
-                // ANTI-REPEAT LOGIC: If last two were same, force the other
                 if (lastTwo.length === 2 && lastTwo[0] === lastTwo[1]) {
                     finalType = (lastTwo[0] === "baba") ? "mama" : "baba";
                 } else {
@@ -150,10 +154,10 @@
 
             let resultFile = isJP ? "babamama.jpg" : finalType + (Math.floor(Math.random()*10)+1) + ".jpg";
             document.getElementById('pic').src = resultFile;
-            document.getElementById('pic').classList.remove('spinning-photo');
             
             currentResult = { isJP, isMama: resultFile.includes("mama") };
             const overlay = document.getElementById('border-overlay');
+            
             if(isJP) overlay.className = "neon-rgb";
             else overlay.className = currentResult.isMama ? "neon-purple" : "neon-yellow";
         }
@@ -168,7 +172,8 @@
                     sounds.jackpot.play(); 
                     spinCount = 0; 
                     jackpotGoal = Math.floor(Math.random() * 3) + 3;
-                    for(let i=0; i<80; i++) spawn(true, ["👩","🍌","✨","🥳","❤️"]); // Baba-Mama Win emojis
+                    // Mama, Banana, Celebrations
+                    for(let i=0; i<80; i++) spawn(true, ["👩","🍌","✨","🥳","❤️"]); 
                 } else { 
                     sounds.win.play(); 
                     let winEmojis = currentResult.isMama ? ["👩","❤️","✨"] : ["🍌","💛","✨"];
